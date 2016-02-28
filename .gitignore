@@ -32,3 +32,9 @@ cythonize.dat
 pywt/__config__.py
 pywt/version.py
 build.log
+
+# asv files
+asv/env
+asv/html
+asv/pywt
+asv/results
