@@ -12,7 +12,7 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 
-from ._extensions._pywt import Wavelet
+from ._extensions._pywt import Wavelet, _check_dtype
 from ._extensions._dwt import dwt_max_level
 from ._dwt import dwt, idwt
 from ._multidim import dwt2, idwt2, dwtn, idwtn, _fix_coeffs
@@ -284,6 +284,8 @@ def iswt(coeffs, wavelet):
     """
 
     output = coeffs[0][0].copy()  # Avoid modification of input data
+    iscomplex = np.iscomplexobj(output)
+    output = np.array(output, dtype=_check_dtype(output))
 
     # num_levels, equivalent to the decomposition level, n
     num_levels = len(coeffs)
@@ -293,6 +295,11 @@ def iswt(coeffs, wavelet):
         step_size = int(pow(2, j-1))
         last_index = step_size
         _, cD = coeffs[num_levels - j]
+        if not iscomplex and cD.dtype == output.dtype:
+            # can disable dtype checks in idwt for speed
+            check_inputs = False
+        else:
+            check_inputs = True
         for first in range(last_index):  # 0 to last_index - 1
 
             # Getting the indices that we will transform
@@ -306,9 +313,9 @@ def iswt(coeffs, wavelet):
             # perform the inverse dwt on the selected indices,
             # making sure to use periodic boundary conditions
             x1 = idwt(output[even_indices], cD[even_indices],
-                      wavelet, 'periodization')
+                      wavelet, 'periodization', check_inputs=check_inputs)
             x2 = idwt(output[odd_indices], cD[odd_indices],
-                      wavelet, 'periodization')
+                      wavelet, 'periodization', check_inputs=check_inputs)
 
             # perform a circular shift right
             x2 = np.roll(x2, 1)

@@ -79,7 +79,7 @@ def dwt_coeff_len(data_len, filter_len, mode):
     return _dwt_coeff_len(data_len, filter_len, Modes.from_object(mode))
 
 
-def dwt(data, wavelet, mode='symmetric', axis=-1):
+def dwt(data, wavelet, mode='symmetric', axis=-1, check_inputs=True):
     """
     dwt(data, wavelet, mode='symmetric', axis=-1)
 
@@ -96,7 +96,9 @@ def dwt(data, wavelet, mode='symmetric', axis=-1):
     axis: int, optional
         Axis over which to compute the DWT. If not given, the
         last axis is used.
-
+    check_inputs : bool, optional
+        If False, disable various checks on the inputs.  This assumes, `data`
+        has dtype np.float32 or np.float64.
 
     Returns
     -------
@@ -124,15 +126,19 @@ def dwt(data, wavelet, mode='symmetric', axis=-1):
     array([-0.70710678, -0.70710678, -0.70710678])
 
     """
-    if np.iscomplexobj(data):
-        data = np.asarray(data)
-        cA_r, cD_r = dwt(data.real, wavelet, mode)
-        cA_i, cD_i = dwt(data.imag, wavelet, mode)
-        return (cA_r + 1j*cA_i, cD_r + 1j*cD_i)
+    if check_inputs:
+        if np.iscomplexobj(data):
+            data = np.asarray(data)
+            cA_r, cD_r = dwt(data.real, wavelet, mode)
+            cA_i, cD_i = dwt(data.imag, wavelet, mode)
+            return (cA_r + 1j*cA_i, cD_r + 1j*cD_i)
 
-    # accept array_like input; make a copy to ensure a contiguous array
-    dt = _check_dtype(data)
-    data = np.array(data, dtype=dt)
+        # accept array_like input; make a copy to ensure a contiguous array
+        dt = _check_dtype(data)
+        data = np.array(data, dtype=dt)
+    else:
+        data = np.ascontiguousarray(data)
+
     mode = Modes.from_object(mode)
     if not isinstance(wavelet, Wavelet):
         wavelet = Wavelet(wavelet)
@@ -152,7 +158,7 @@ def dwt(data, wavelet, mode='symmetric', axis=-1):
     return (cA, cD)
 
 
-def idwt(cA, cD, wavelet, mode='symmetric', axis=-1):
+def idwt(cA, cD, wavelet, mode='symmetric', axis=-1, check_inputs=True):
     """
     idwt(cA, cD, wavelet, mode='symmetric', axis=-1)
 
@@ -173,7 +179,9 @@ def idwt(cA, cD, wavelet, mode='symmetric', axis=-1):
     axis: int, optional
         Axis over which to compute the inverse DWT. If not given, the
         last axis is used.
-
+    check_inputs : bool, optional
+        If False, disable various checks on the inputs.  This assumes, `cA` and
+        `cD` are either both np.float32 or both np.float64.
 
     Returns
     -------
@@ -183,38 +191,41 @@ def idwt(cA, cD, wavelet, mode='symmetric', axis=-1):
     """
     # TODO: Lots of possible allocations to eliminate (zeros_like, asarray(rec))
     # accept array_like input; make a copy to ensure a contiguous array
+    if check_inputs:
+        if cA is None and cD is None:
+            raise ValueError("At least one coefficient parameter must be "
+                             "specified.")
 
-    if cA is None and cD is None:
-        raise ValueError("At least one coefficient parameter must be "
-                         "specified.")
+        # complex inputs: compute real and imaginary separately then combine
+        if np.iscomplexobj(cA) or np.iscomplexobj(cD):
+            if cA is None:
+                cD = np.asarray(cD)
+                cA = np.zeros_like(cD)
+            elif cD is None:
+                cA = np.asarray(cA)
+                cD = np.zeros_like(cA)
+            return (idwt(cA.real, cD.real, wavelet, mode) +
+                    1j*idwt(cA.imag, cD.imag, wavelet, mode))
 
-    # for complex inputs: compute real and imaginary separately then combine
-    if np.iscomplexobj(cA) or np.iscomplexobj(cD):
-        if cA is None:
-            cD = np.asarray(cD)
+        if cA is not None:
+            dt = _check_dtype(cA)
+            cA = np.array(cA, dtype=dt)
+        if cD is not None:
+            dt = _check_dtype(cD)
+            cD = np.array(cD, dtype=dt)
+
+        if cA is not None and cD is not None:
+            if cA.dtype != cD.dtype:
+                # need to upcast to common type
+                cA = cA.astype(np.float64)
+                cD = cD.astype(np.float64)
+        elif cA is None:
             cA = np.zeros_like(cD)
         elif cD is None:
-            cA = np.asarray(cA)
             cD = np.zeros_like(cA)
-        return (idwt(cA.real, cD.real, wavelet, mode) +
-                1j*idwt(cA.imag, cD.imag, wavelet, mode))
-
-    if cA is not None:
-        dt = _check_dtype(cA)
-        cA = np.array(cA, dtype=dt)
-    if cD is not None:
-        dt = _check_dtype(cD)
-        cD = np.array(cD, dtype=dt)
-
-    if cA is not None and cD is not None:
-        if cA.dtype != cD.dtype:
-            # need to upcast to common type
-            cA = cA.astype(np.float64)
-            cD = cD.astype(np.float64)
-    elif cA is None:
-        cA = np.zeros_like(cD)
-    elif cD is None:
-        cD = np.zeros_like(cA)
+    else:
+        cA = np.ascontiguousarray(cA)
+        cD = np.ascontiguousarray(cD)
 
     # cA and cD should be same dimension by here
     ndim = cA.ndim
