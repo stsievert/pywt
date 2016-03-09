@@ -408,8 +408,8 @@ def test_wavedecn_coeff_reshape_even():
     #   wavedecn - >coeffs_to_array-> array_to_coeffs -> waverecn
     # This is done for wavedec{1, 2, n}
     rng = np.random.RandomState(1234)
-    params = {'wavedec': {'d': 1, 'dec': pywt.wavedecn, 'rec': pywt.waverecn},
-              'wavedec2': {'d': 2, 'dec':pywt.wavedec2, 'rec': pywt.waverec2},
+    params = {'wavedec': {'d': 1, 'dec': pywt.wavedec, 'rec': pywt.waverec},
+              'wavedec2': {'d': 2, 'dec': pywt.wavedec2, 'rec': pywt.waverec2},
               'wavedecn': {'d': 3, 'dec': pywt.wavedecn, 'rec': pywt.waverecn}}
     N = 28
     for f in params:
